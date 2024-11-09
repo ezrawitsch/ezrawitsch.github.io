@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nearby Wikipedia Articles with Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #articles {
+      margin-top: 20px;
+    }
+    .thumbnail {
+      width: 50px;
+      height: 50px;
+    }
+    .no-thumbnail {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #ccc;
+      font-size: 12px;
+      color: #666;
+    }
+    #map {
+      height: 600px;
+      margin: 20px auto;
+      max-width: 800px;
+    }
+    #interest-score {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Find Nearby Wikipedia Articles</h1>
+  <p>Click the button to find Wikipedia articles near your location. Then browse using the map to discover the wonders around you!</p>
+  <button onclick="getLocation()">Get Articles</button>
+  <div id="map"></div>
+  <div id="interest-score"></div>
+
+  <button onclick="sortArticles('distance')">Sort by how close you are to something interesting.</button>
+  <button onclick="sortArticles('length')">Sort by the most interesting things in your vicinity. </button>
+
+  <div id="articles"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let map;
+    let centerMarker;
+    let centerCircle;
+    let fetchedArticles = [];
+    let userLocation = null;
+
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition, showError);
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    }
+
+    function showPosition(position) {
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      userLocation = { lat: latitude, lon: longitude };
+
+      // Initialize the map
+      if (!map) {
+        map = L.map('map').setView([latitude, longitude], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add marker for user's current location
+        L.marker([latitude, longitude]).addTo(map)
+          .bindPopup('Your current location')
+          .openPopup();
+
+        // Add a red marker and circle that stays in the center of the map
+        addCenterMarkerAndCircle(map.getCenter());
+
+        // Fetch articles based on the initial location
+        fetchWikipediaArticles(latitude, longitude);
+
+        // Add event listener for map drag end
+        map.on('moveend', () => {
+          const center = map.getCenter();
+          updateCenterMarkerAndCircle(center);
+          fetchWikipediaArticles(center.lat, center.lng);
+        });
+
+        // Add event listener for map zoom end
+        map.on('zoomend', () => {
+          updateCenterMarkerAndCircle(map.getCenter());
+        });
+
+        // Add event listener for double-click to recenter map and fetch articles
+        map.on('dblclick', (e) => {
+          const { lat, lng } = e.latlng;
+          map.setView([lat, lng], 13);
+          updateCenterMarkerAndCircle(e.latlng);
+          fetchWikipediaArticles(lat, lng);
+        });
+      } else {
+        map.setView([latitude, longitude], 13);
+        updateCenterMarkerAndCircle(map.getCenter());
+        fetchWikipediaArticles(latitude, longitude);
+      }
+    }
+
+    function addCenterMarkerAndCircle(center) {
+      centerMarker = L.marker(center, { color: 'red' }).addTo(map);
+      centerCircle = L.circle(center, { radius: 400, color: 'red', fillOpacity: 0.2 }).addTo(map);
+    }
+
+    function updateCenterMarkerAndCircle(center) {
+      if (centerMarker && centerCircle) {
+        centerMarker.setLatLng(center);
+        centerCircle.setLatLng(center);
+      } else {
+        addCenterMarkerAndCircle(center);
+      }
+    }
+
+    function showError(error) {
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          alert("User denied the request for Geolocation.");
+          break;
+        case error.POSITION_UNAVAILABLE:
+          alert("Location information is unavailable.");
+          break;
+        case error.TIMEOUT:
+          alert("The request to get user location timed out.");
+          break;
+        case error.UNKNOWN_ERROR:
+          alert("An unknown error occurred.");
+          break;
+      }
+    }
+
+    function fetchWikipediaArticles(latitude, longitude) {
+      const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${latitude}|${longitude}&gsradius=400&gslimit=50&format=json&origin=*`;
+
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          const articles = data.query.geosearch;
+
+          // Get a list of page IDs to fetch further details
+          const pageIds = articles.map(article => article.pageid).join('|');
+
+          // Fetch detailed information for each article, including the length and thumbnail
+          const detailsApiUrl = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageIds}&prop=info|pageimages&piprop=thumbnail&pithumbsize=100&format=json&origin=*`;
+
+          fetch(detailsApiUrl)
+            .then(response => response.json())
+            .then(detailsData => {
+              fetchedArticles = articles.map(article => {
+                const articleDetails = detailsData.query.pages[article.pageid];
+                return {
+                  ...article,
+                  length: articleDetails.length,
+                  thumbnail: articleDetails.thumbnail ? articleDetails.thumbnail.source : null
+                };
+              });
+              displayArticles(fetchedArticles);
+            })
+            .catch(error => {
+              console.error('Error fetching article details:', error);
+            });
+        })
+        .catch(error => {
+          console.error('Error fetching Wikipedia articles:', error);
+        });
+    }
+
+    function displayArticles(articles) {
+      const articlesDiv = document.getElementById('articles');
+      articlesDiv.innerHTML = ''; // Clear previous results
+
+      const interestScoreDiv = document.getElementById('interest-score');
+
+      // Clear previous markers (if any)
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker && layer.getPopup() && layer.getPopup().getContent() !== 'Your current location') {
+          map.removeLayer(layer);
+        }
+      });
+
+      if (articles.length === 0) {
+        articlesDiv.innerHTML = '<p>No nearby articles found within a five minute walk.</p>';
+        interestScoreDiv.innerHTML = 'Interest Score: 0 (No notable places found nearby)';
+      } else {
+        // Create table for articles
+        const table = document.createElement('table');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+          <th>Thumbnail</th>
+          <th>Article Title</th>
+          <th>How Far Away You Are</th>
+          <th>Ink Spilled, in Bytes</th>
+        `;
+        table.appendChild(headerRow);
+
+        // Populate table rows with article data
+        articles.forEach(article => {
+          const row = document.createElement('tr');
+
+          // Thumbnail cell
+          const thumbnailCell = document.createElement('td');
+          if (article.thumbnail) {
+            const thumbnailImg = document.createElement('img');
+            thumbnailImg.src = article.thumbnail;
+            thumbnailImg.alt = `${article.title} thumbnail`;
+            thumbnailImg.classList.add('thumbnail');
+            thumbnailCell.appendChild(thumbnailImg);
+          } else {
+            const noThumbnailDiv = document.createElement('div');
+            noThumbnailDiv.classList.add('no-thumbnail');
+            noThumbnailDiv.textContent = 'No image';
+            thumbnailCell.appendChild(noThumbnailDiv);
+          }
+          row.appendChild(thumbnailCell);
+
+          // Title cell
+          const titleCell = document.createElement('td');
+          const articleLink = document.createElement('a');
+          articleLink.href = `https://en.wikipedia.org/wiki/${article.title}`;
+          articleLink.target = '_blank';
+          articleLink.textContent = article.title;
+          titleCell.appendChild(articleLink);
+          row.appendChild(titleCell);
+
+          // Distance cell
+          const distanceCell = document.createElement('td');
+          const distance = calculateDistance(userLocation.lat, userLocation.lon, article.lat, article.lon);
+          const directionsLink = document.createElement('a');
+          directionsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lon}&destination=${article.lat},${article.lon}&travelmode=walking`;
+          directionsLink.target = '_blank';
+          directionsLink.textContent = `${Math.round(distance)} meters`;
+          distanceCell.appendChild(directionsLink);
+          row.appendChild(distanceCell);
+
+          // Length cell
+          const lengthCell = document.createElement('td');
+          lengthCell.textContent = `${article.length} bytes`;
+          row.appendChild(lengthCell);
+
+          table.appendChild(row);
+
+          // Add marker for each article location
+          L.marker([article.lat, article.lon]).addTo(map)
+            .bindPopup(`<a href="https://en.wikipedia.org/wiki/${article.title}" target="_blank">${article.title}</a>`);
+        });
+
+        articlesDiv.appendChild(table);
+
+        // Display interest score
+        interestScoreDiv.innerHTML = `Interest Score: ${articles.length} (Number of notable places within 400 m)`;
+      }
+    }
+
+    function sortArticles(criteria) {
+      if (criteria === 'distance') {
+        fetchedArticles.sort((a, b) => calculateDistance(userLocation.lat, userLocation.lon, a.lat, a.lon) - calculateDistance(userLocation.lat, userLocation.lon, b.lat, b.lon));
+      } else if (criteria === 'length') {
+        fetchedArticles.sort((a, b) => b.length - a.length);
+      }
+      displayArticles(fetchedArticles);
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; // metres
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      const d = R * c;
+
+      return d;
+    }
+  </script>
+</body>
+</html>
