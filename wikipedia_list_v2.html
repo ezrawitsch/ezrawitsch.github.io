@@ -106,6 +106,9 @@
     let centerCircle;
     let fetchedArticles = [];
     let userLocation = null;
+    let moveendListener;
+    let zoomendListener;
+    let dblclickListener;
 
     // Determine if the user prefers dark mode
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -132,6 +135,31 @@
 
       // Add a red marker and circle that stays in the center of the map
       addCenterMarkerAndCircle(map.getCenter());
+
+      // Add event listener for map drag end
+      moveendListener = () => {
+        const center = map.getCenter();
+        updateCenterMarkerAndCircle(center);
+        if (userLocation && calculateDistance(userLocation.lat, userLocation.lon, center.lat, center.lng) > 1000) {
+          fetchWikipediaArticles(center.lat, center.lng);
+        }
+      };
+      map.on('moveend', moveendListener);
+
+      // Add event listener for map zoom end
+      zoomendListener = () => {
+        updateCenterMarkerAndCircle(map.getCenter());
+      };
+      map.on('zoomend', zoomendListener);
+
+      // Add event listener for double-click to recenter map and fetch articles
+      dblclickListener = (e) => {
+        const { lat, lng } = e.latlng;
+        map.setView([lat, lng], 13);
+        updateCenterMarkerAndCircle(e.latlng);
+        fetchWikipediaArticles(lat, lng);
+      };
+      map.on('dblclick', dblclickListener);
     });
 
     function getLocation() {
@@ -162,27 +190,15 @@
         fetchWikipediaArticles(latitude, longitude);
       });
 
-      // Add event listener for map drag end
-      map.on('moveend', () => {
-        const center = map.getCenter();
-        updateCenterMarkerAndCircle(center);
-        if (calculateDistance(userLocation.lat, userLocation.lon, center.lat, center.lng) > 1000) {
-          fetchWikipediaArticles(center.lat, center.lng);
-        }
-      });
+      // Remove previous event listeners to avoid duplicates
+      map.off('moveend', moveendListener);
+      map.off('zoomend', zoomendListener);
+      map.off('dblclick', dblclickListener);
 
-      // Add event listener for map zoom end
-      map.on('zoomend', () => {
-        updateCenterMarkerAndCircle(map.getCenter());
-      });
-
-      // Add event listener for double-click to recenter map and fetch articles
-      map.on('dblclick', (e) => {
-        const { lat, lng } = e.latlng;
-        map.setView([lat, lng], 13);
-        updateCenterMarkerAndCircle(e.latlng);
-        fetchWikipediaArticles(lat, lng);
-      });
+      // Add event listeners again to ensure they are active
+      map.on('moveend', moveendListener);
+      map.on('zoomend', zoomendListener);
+      map.on('dblclick', dblclickListener);
     }
 
     function addCenterMarkerAndCircle(center) {
