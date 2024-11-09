@@ -1,104 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nearby Wikipedia Articles with Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" />
-  <style>
-    body {
-      font-family: 'Fira Code', monospace;
-      margin: 20px;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-    }
-    #articles {
-      margin-top: 20px;
-    }
-    .thumbnail {
-      width: 50px;
-      height: 50px;
-    }
-    .no-thumbnail {
-      width: 50px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #ccc;
-      font-size: 12px;
-      color: #666;
-    }
-    #map {
-      height: 600px;
-      margin: 20px auto;
-      max-width: 800px;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    }
-    #interest-score {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    table, th, td {
-      border: 1px solid #ddd;
-    }
-    th, td {
-      padding: 10px;
-      text-align: left;
-    }
-    th {
-      color: var(--th-text-color);
-      background-color: var(--th-bg-color);
-    }
-    button {
-      display: block;
-      font-family: 'Fira Code', monospace;
-      width: 300px;
-      height: 60px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      font-size: 1.2em;
-      margin: 20px auto;
-      cursor: pointer;
-      border-radius: 0;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #loading {
-      display: none;
-      font-size: 1.2em;
-      text-align: center;
-      margin-top: 20px;
-    }
-    a {
-      color: var(--link-color);
-      text-decoration: underline;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Wikipedia Articles with Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" />
+    <style>
+      body {
+        font-family: 'Fira Code', monospace;
+        margin: 20px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+      #articles {
+        margin-top: 20px;
+      }
+      .thumbnail {
+        width: 50px;
+        height: 50px;
+      }
+      .no-thumbnail {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ccc;
+        font-size: 12px;
+        color: #666;
+      }
+      #map {
+        height: 600px;
+        margin: 20px auto;
+        max-width: 800px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      #interest-score {
+        margin-top: 20px;
+        font-weight: bold;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      table, th, td {
+        border: 1px solid #ddd;
+      }
+      th, td {
+        padding: 10px;
+        text-align: left;
+      }
+      th {
+        color: var(--th-text-color);
+        background-color: var(--th-bg-color);
+      }
+      button {
+        display: block;
+        font-family: 'Fira Code', monospace;
+        width: 300px;
+        height: 60px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        font-size: 1.2em;
+        margin: 20px auto;
+        cursor: pointer;
+        border-radius: 0;
+        transition: background-color 0.3s ease;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #loading {
+        display: none;
+        font-size: 1.2em;
+        text-align: center;
+        margin-top: 20px;
+      }
+      a {
+        color: var(--link-color);
+        text-decoration: underline;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      </style>
 </head>
 <body>
-  <h1>Find Nearby Wikipedia Articles</h1>
-  <p>Click the button to find interesting places within a 5 minute walk. Or browse using the map to discover the wonders around you!</p>
-  <button onclick="getLocation()">Get Articles</button>
-  <div id="loading">Loading...</div>
-  <div id="map"></div>
-  <div id="interest-score"></div>
-  <button onclick="sortArticles('distance')">Sort by distance</button>
-  <button onclick="sortArticles('length')">Sort by the most interesting places</button>
-  <div id="articles"></div>
+    <h1>Find Nearby Wikipedia Articles</h1>
+    <p>Click the button to find interesting places within a 5 minute walk. Or browse using the map to discover the wonders around you!</p>
+    <button onclick="getLocation()">Get Articles</button>
+    <div id="loading">Loading...</div>
+    <div id="map"></div>
+    <div id="interest-score"></div>
+    <button onclick="sortArticles('distance')">Sort by distance</button>
+    <button onclick="sortArticles('length')">Sort by the most interesting places</button>
+    <div id="articles"></div>
+
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     let map;
@@ -106,11 +107,10 @@
     let centerCircle;
     let fetchedArticles = [];
     let userLocation = null;
-    let moveendListener;
-    let zoomendListener;
-    let dblclickListener;
+    let lastFetchedLocation = null;
+    let isProgrammaticMove = false;
 
-    // Determine if the user prefers dark mode
+   // Determine if the user prefers dark mode
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
     document.documentElement.style.setProperty('--bg-color', prefersDarkScheme ? '#333' : '#f4f4f9');
@@ -137,28 +137,12 @@
       addCenterMarkerAndCircle(map.getCenter());
 
       // Add event listener for map drag end
-      moveendListener = () => {
-        const center = map.getCenter();
-        updateCenterMarkerAndCircle(center);
-        if (userLocation && calculateDistance(userLocation.lat, userLocation.lon, center.lat, center.lng) > 1000) {
-          fetchWikipediaArticles(center.lat, center.lng);
-        }
-      };
       map.on('moveend', moveendListener);
 
       // Add event listener for map zoom end
-      zoomendListener = () => {
-        updateCenterMarkerAndCircle(map.getCenter());
-      };
       map.on('zoomend', zoomendListener);
 
       // Add event listener for double-click to recenter map and fetch articles
-      dblclickListener = (e) => {
-        const { lat, lng } = e.latlng;
-        map.setView([lat, lng], 13);
-        updateCenterMarkerAndCircle(e.latlng);
-        fetchWikipediaArticles(lat, lng);
-      };
       map.on('dblclick', dblclickListener);
     });
 
@@ -176,9 +160,12 @@
       const longitude = position.coords.longitude;
       userLocation = { lat: latitude, lon: longitude };
 
-      // Set the map view to the user's location and wait for it to finish before updating markers
-      map.setView([latitude, longitude], 13, { animate: true, duration: 1 }).on('moveend', () => {
-        // Update center marker and circle to the user's current location after map view is set
+      // Set the map view to the user's location
+      isProgrammaticMove = true;
+      map.setView([latitude, longitude], 13, { animate: true, duration: 1 });
+
+      // When the map has finished moving, update the center marker and fetch articles
+      map.once('moveend', () => {
         updateCenterMarkerAndCircle({ lat: latitude, lng: longitude });
 
         // Add a marker for user's current location with the default Leaflet marker
@@ -189,16 +176,6 @@
         // Fetch articles based on the initial location
         fetchWikipediaArticles(latitude, longitude);
       });
-
-      // Remove previous event listeners to avoid duplicates
-      map.off('moveend', moveendListener);
-      map.off('zoomend', zoomendListener);
-      map.off('dblclick', dblclickListener);
-
-      // Add event listeners again to ensure they are active
-      map.on('moveend', moveendListener);
-      map.on('zoomend', zoomendListener);
-      map.on('dblclick', dblclickListener);
     }
 
     function addCenterMarkerAndCircle(center) {
@@ -234,6 +211,7 @@
     }
 
     function fetchWikipediaArticles(latitude, longitude) {
+      lastFetchedLocation = { lat: latitude, lon: longitude };
       const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${latitude}|${longitude}&gsradius=400&gslimit=50&format=json&origin=*`;
 
       fetch(apiUrl)
@@ -331,9 +309,14 @@
 
           // Distance cell
           const distanceCell = document.createElement('td');
-          const distance = calculateDistance(userLocation.lat, userLocation.lon, article.lat, article.lon);
+          let distance;
+          if (userLocation) {
+            distance = calculateDistance(userLocation.lat, userLocation.lon, article.lat, article.lon);
+          } else {
+            distance = calculateDistance(lastFetchedLocation.lat, lastFetchedLocation.lon, article.lat, article.lon);
+          }
           const directionsLink = document.createElement('a');
-          directionsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lon}&destination=${article.lat},${article.lon}&travelmode=walking`;
+          directionsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${userLocation ? `${userLocation.lat},${userLocation.lon}` : `${lastFetchedLocation.lat},${lastFetchedLocation.lon}`}&destination=${article.lat},${article.lon}&travelmode=walking`;
           directionsLink.target = '_blank';
           directionsLink.textContent = `${(distance / 1000).toFixed(2)} km`;
           distanceCell.appendChild(directionsLink);
@@ -359,7 +342,17 @@
 
     function sortArticles(criteria) {
       if (criteria === 'distance') {
-        fetchedArticles.sort((a, b) => calculateDistance(userLocation.lat, userLocation.lon, a.lat, a.lon) - calculateDistance(userLocation.lat, userLocation.lon, b.lat, b.lon));
+        fetchedArticles.sort((a, b) => {
+          let distanceA, distanceB;
+          if (userLocation) {
+            distanceA = calculateDistance(userLocation.lat, userLocation.lon, a.lat, a.lon);
+            distanceB = calculateDistance(userLocation.lat, userLocation.lon, b.lat, b.lon);
+          } else {
+            distanceA = calculateDistance(lastFetchedLocation.lat, lastFetchedLocation.lon, a.lat, a.lon);
+            distanceB = calculateDistance(lastFetchedLocation.lat, lastFetchedLocation.lon, b.lat, b.lon);
+          }
+          return distanceA - distanceB;
+        });
       } else if (criteria === 'length') {
         fetchedArticles.sort((a, b) => b.length - a.length);
       }
@@ -381,6 +374,34 @@
       const d = R * c;
 
       return d * 1000; // return distance in meters
+    }
+
+    function moveendListener() {
+      if (isProgrammaticMove) {
+        isProgrammaticMove = false;
+        return;
+      }
+      const center = map.getCenter();
+      updateCenterMarkerAndCircle(center);
+      if (!lastFetchedLocation || calculateDistance(lastFetchedLocation.lat, lastFetchedLocation.lon, center.lat, center.lng) > 500) {
+        fetchWikipediaArticles(center.lat, center.lng);
+      }
+    }
+
+    function zoomendListener() {
+      updateCenterMarkerAndCircle(map.getCenter());
+    }
+
+    function dblclickListener(e) {
+      const { lat, lng } = e.latlng;
+      isProgrammaticMove = true;
+      map.setView([lat, lng], 13);
+
+      // When the map has finished moving, update the center marker and fetch articles
+      map.once('moveend', () => {
+        updateCenterMarkerAndCircle(e.latlng);
+        fetchWikipediaArticles(lat, lng);
+      });
     }
   </script>
 </body>
