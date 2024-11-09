@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nearby Wikipedia Articles with Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" />
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Fira Code', monospace;
       margin: 20px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
     }
     #articles {
       margin-top: 20px;
@@ -31,6 +34,8 @@
       height: 600px;
       margin: 20px auto;
       max-width: 800px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
     #interest-score {
       margin-top: 20px;
@@ -49,22 +54,51 @@
       text-align: left;
     }
     th {
-      background-color: #f2f2f2;
+      color: var(--th-text-color);
+      background-color: var(--th-bg-color);
     }
-  </style>
+    button {
+      display: block;
+      font-family: 'Fira Code', monospace;
+      width: 300px;
+      height: 60px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      font-size: 1.2em;
+      margin: 20px auto;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #loading {
+      display: none;
+      font-size: 1.2em;
+      text-align: center;
+      margin-top: 20px;
+    }
+    a {
+      color: var(--link-color);
+      text-decoration: underline;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    </style>
 </head>
 <body>
   <h1>Find Nearby Wikipedia Articles</h1>
-  <p>Click the button to find Wikipedia articles near your location. Then browse using the map to discover the wonders around you!</p>
+  <p>Click the button to find interesting places within a 5 minute walk. Or browse using the map to discover the wonders around you!</p>
   <button onclick="getLocation()">Get Articles</button>
+  <div id="loading">Loading...</div>
   <div id="map"></div>
   <div id="interest-score"></div>
-
-  <button onclick="sortArticles('distance')">Sort by how close you are to something interesting.</button>
-  <button onclick="sortArticles('length')">Sort by the most interesting things in your vicinity. </button>
-
+  <button onclick="sortArticles('distance')">Sort by distance</button>
+  <button onclick="sortArticles('length')">Sort by the most interesting places</button>
   <div id="articles"></div>
-
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     let map;
@@ -73,8 +107,36 @@
     let fetchedArticles = [];
     let userLocation = null;
 
+    // Determine if the user prefers dark mode
+    const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    document.documentElement.style.setProperty('--bg-color', prefersDarkScheme ? '#333' : '#f4f4f9');
+    document.documentElement.style.setProperty('--text-color', prefersDarkScheme ? '#f4f4f9' : '#333');
+    document.documentElement.style.setProperty('--link-color', prefersDarkScheme ? '#f4f4f9' : '#007bff');
+    document.documentElement.style.setProperty('--th-text-color', prefersDarkScheme ? '#f4f4f9' : '#000');
+    document.documentElement.style.setProperty('--th-bg-color', prefersDarkScheme ? '#000' : '#f2f2f2');
+
+    // Initialize the map on page load
+    window.addEventListener('load', () => {
+      const defaultLatitude = 51.5074;
+      const defaultLongitude = -0.1278;
+      map = L.map('map').setView([defaultLatitude, defaultLongitude], 13);
+
+      const tileUrl = prefersDarkScheme
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+      L.tileLayer(tileUrl, {
+        attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+      }).addTo(map);
+
+      // Add a red marker and circle that stays in the center of the map
+      addCenterMarkerAndCircle(map.getCenter());
+    });
+
     function getLocation() {
       if (navigator.geolocation) {
+        document.getElementById('loading').style.display = 'block';
         navigator.geolocation.getCurrentPosition(showPosition, showError);
       } else {
         alert("Geolocation is not supported by this browser.");
@@ -86,53 +148,45 @@
       const longitude = position.coords.longitude;
       userLocation = { lat: latitude, lon: longitude };
 
-      // Initialize the map
-      if (!map) {
-        map = L.map('map').setView([latitude, longitude], 13);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+      // Set the map view to the user's location and wait for it to finish before updating markers
+      map.setView([latitude, longitude], 13, { animate: true, duration: 1 }).on('moveend', () => {
+        // Update center marker and circle to the user's current location after map view is set
+        updateCenterMarkerAndCircle({ lat: latitude, lng: longitude });
 
-        // Add marker for user's current location
+        // Add a marker for user's current location with the default Leaflet marker
         L.marker([latitude, longitude]).addTo(map)
           .bindPopup('Your current location')
           .openPopup();
 
-        // Add a red marker and circle that stays in the center of the map
-        addCenterMarkerAndCircle(map.getCenter());
-
         // Fetch articles based on the initial location
         fetchWikipediaArticles(latitude, longitude);
+      });
 
-        // Add event listener for map drag end
-        map.on('moveend', () => {
-          const center = map.getCenter();
-          updateCenterMarkerAndCircle(center);
+      // Add event listener for map drag end
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        updateCenterMarkerAndCircle(center);
+        if (calculateDistance(userLocation.lat, userLocation.lon, center.lat, center.lng) > 1000) {
           fetchWikipediaArticles(center.lat, center.lng);
-        });
+        }
+      });
 
-        // Add event listener for map zoom end
-        map.on('zoomend', () => {
-          updateCenterMarkerAndCircle(map.getCenter());
-        });
-
-        // Add event listener for double-click to recenter map and fetch articles
-        map.on('dblclick', (e) => {
-          const { lat, lng } = e.latlng;
-          map.setView([lat, lng], 13);
-          updateCenterMarkerAndCircle(e.latlng);
-          fetchWikipediaArticles(lat, lng);
-        });
-      } else {
-        map.setView([latitude, longitude], 13);
+      // Add event listener for map zoom end
+      map.on('zoomend', () => {
         updateCenterMarkerAndCircle(map.getCenter());
-        fetchWikipediaArticles(latitude, longitude);
-      }
+      });
+
+      // Add event listener for double-click to recenter map and fetch articles
+      map.on('dblclick', (e) => {
+        const { lat, lng } = e.latlng;
+        map.setView([lat, lng], 13);
+        updateCenterMarkerAndCircle(e.latlng);
+        fetchWikipediaArticles(lat, lng);
+      });
     }
 
     function addCenterMarkerAndCircle(center) {
-      centerMarker = L.marker(center, { color: 'red' }).addTo(map);
+      centerMarker = L.marker(center).addTo(map); // Use default marker
       centerCircle = L.circle(center, { radius: 400, color: 'red', fillOpacity: 0.2 }).addTo(map);
     }
 
@@ -146,6 +200,7 @@
     }
 
     function showError(error) {
+      document.getElementById('loading').style.display = 'none';
       switch (error.code) {
         case error.PERMISSION_DENIED:
           alert("User denied the request for Geolocation.");
@@ -187,13 +242,16 @@
                   thumbnail: articleDetails.thumbnail ? articleDetails.thumbnail.source : null
                 };
               });
+              document.getElementById('loading').style.display = 'none';
               displayArticles(fetchedArticles);
             })
             .catch(error => {
+              document.getElementById('loading').style.display = 'none';
               console.error('Error fetching article details:', error);
             });
         })
         .catch(error => {
+          document.getElementById('loading').style.display = 'none';
           console.error('Error fetching Wikipedia articles:', error);
         });
     }
@@ -261,7 +319,7 @@
           const directionsLink = document.createElement('a');
           directionsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lon}&destination=${article.lat},${article.lon}&travelmode=walking`;
           directionsLink.target = '_blank';
-          directionsLink.textContent = `${Math.round(distance)} meters`;
+          directionsLink.textContent = `${(distance / 1000).toFixed(2)} km`;
           distanceCell.appendChild(directionsLink);
           row.appendChild(distanceCell);
 
@@ -269,7 +327,6 @@
           const lengthCell = document.createElement('td');
           lengthCell.textContent = `${article.length} bytes`;
           row.appendChild(lengthCell);
-
           table.appendChild(row);
 
           // Add marker for each article location
@@ -294,7 +351,7 @@
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371e3; // metres
+      const R = 6371; // kilometers
       const φ1 = lat1 * Math.PI / 180;
       const φ2 = lat2 * Math.PI / 180;
       const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -307,7 +364,7 @@
 
       const d = R * c;
 
-      return d;
+      return d * 1000; // return distance in meters
     }
   </script>
 </body>
